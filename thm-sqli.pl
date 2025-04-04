@@ -4,7 +4,6 @@ use feature qw{ say };
 use strict;
 use warnings;
 use Getopt::Long qw(GetOptions);
-use List::MoreUtils qw(any);           
 use Selenium::Remote::Driver;
 use Selenium::Remote::WDKeys;
 
